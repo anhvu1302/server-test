@@ -5,7 +5,8 @@
   "proxy": "http://localhost:4000",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "jest"
   },
   "author": "Vu Van Anh",
   "license": "MIT",
@@ -38,7 +39,9 @@
     "speakeasy": "^2.0.0"
   },
   "devDependencies": {
+    "jest": "^29.7.0",
     "nodemon": "^3.0.2",
-    "sequelize-cli": "^6.6.2"
+    "sequelize-cli": "^6.6.2",
+    "supertest": "^7.0.0"
   }
 }
