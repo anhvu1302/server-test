@@ -1,0 +1,11 @@
+/node_modules
+/public/files
+/public/images/*
+!/public/images/app/
+/.history
+
+/.env
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
