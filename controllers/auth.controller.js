@@ -121,17 +121,11 @@ const getUserInfo = async (req, res) => {
     delete sanitizedUser.SecretKey;
     delete sanitizedUser.OTP;
 
-    const jsonData = JSON.stringify({
+    return res.status(200).send({
       message: "Successful",
       userLogin: sanitizedUser,
       token: token ? token : null,
     });
-    const encrypted = CryptoJS.AES.encrypt(
-      jsonData,
-      process.env.APP_SECRET_KEY
-    ).toString();
-
-    return res.status(200).send(encrypted);
   } catch (error) {
     return handleErrorResponse(res, 500, error);
   }
