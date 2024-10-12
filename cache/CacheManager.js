@@ -1,7 +1,7 @@
 const redisCache = require("./RedisCache");
-(async () => {
-  await redisCache.initializeRedisClient();
-})();
+// (async () => {
+//   await redisCache.initializeRedisClient();
+// })();
 class CacheManager {
   constructor(baseKey) {
     if (!baseKey) {
