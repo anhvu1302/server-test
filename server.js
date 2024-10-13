@@ -43,7 +43,7 @@ if (cluster.isMaster) {
   const port = process.env.PORT || 4000;
   app.listen(port, () => {
     console.log(
-      `Worker ${process.pid} started and listening on port http://server.local:${port}`
+      `Worker ${process.pid} started and listening on port http://localhost:${port}`
     );
   });
 
