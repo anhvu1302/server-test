@@ -13,6 +13,34 @@ const {
 const handleErrorResponse = require("../utils/handleErrorResponse");
 
 const cacheManager = new CacheManager("order");
+const createOrder = async (req, res) => {
+  const { PhoneNumber, DeliveryAddress, PaymentMethod, TotalAmount, ShippingFee, orderDetails } = req.body;
+  try {
+    const newOrder = await Order.create({
+      UserId: req.params.UserId,
+      PhoneNumber,
+      DeliveryAddress,
+      PaymentMethod,
+      TotalAmount,
+      ShippingFee,
+      OrderTime: new Date(),
+    });
+
+    if (orderDetails && orderDetails.length > 0) {
+      for (const detail of orderDetails) {
+        await OrderDetail.create({
+          ...detail,
+          OrderId: newOrder.OrderId,
+        });
+      }
+    }
+
+    res.status(201).send({ message: "Order created successfully", orderId: newOrder.OrderId });
+  } catch (error) {
+    console.error("Error while adding order:", error); // Thêm log để kiểm tra lỗi
+    handleErrorResponse(res, 500, error);
+  }
+};
 
 const getAllOrder = async (req, res) => {
   try {
@@ -202,4 +230,5 @@ module.exports = {
   getAllOrder,
   getOrderDetail,
   restoreOrder,
+  createOrder,
 };

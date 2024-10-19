@@ -438,8 +438,22 @@ const createOrder = async (req, res) => {
     Note,
     orderDetails,
   } = req.body;
-  const t = await sequelize.transaction();
 
+  if (!PhoneNumber || PhoneNumber.trim() === '') {
+    return res.status(400).json({ message: 'PhoneNumber is required' });
+  }
+  const phoneRegex = /^[0-9]{10}$/;  // Kiểm tra số điện thoại có đúng 10 chữ số không
+  if (!phoneRegex.test(PhoneNumber)) {
+    return res.status(400).json({ message: 'PhoneNumber is invalid' });
+  }
+  if (!DeliveryAddress || DeliveryAddress.trim() === '') {
+    return res.status(400).json({ message: 'DeliveryAddress is required' });
+  }
+  if (!PaymentMethod || PaymentMethod.trim() === '') {
+    return res.status(400).json({ message: 'PaymentMethod is required' });
+  }
+
+  const t = await sequelize.transaction();
   try {
     const order = await Order.create(
       {
@@ -499,6 +513,7 @@ const createOrder = async (req, res) => {
       .status(201)
       .send({ message: "Order created successfully", orderId: order.OrderId });
   } catch (error) {
+    console.log(error);
     await t.rollback();
     if (
       error.name === "SequelizeDatabaseError" &&
@@ -512,100 +527,173 @@ const createOrder = async (req, res) => {
     }
   }
 };
-
 const cancelOrder = async (req, res) => {
-  const { UserId, OrderId } = req.params;
+  const { OrderId } = req.params;
   const t = await sequelize.transaction();
-  try {
-    if (UserId !== req.session.user.UserId) {
-      return res
-        .status(403)
-        .send({ message: "You do not have permission to delete this order" });
-    }
-    const order = await Order.findOne(
-      {
-        where: {
-          OrderId,
-        },
-      },
-      { transaction: t }
-    );
-    if (order.UserId !== req.session.user.UserId) {
-      res.status(403).send({ message: "Access denied" });
-    } else {
-      order.CancelledAt = new Date();
-      await order.save({ transaction: t });
-      await OrderState.create(
-        {
-          OrderId: order.OrderId,
-          Status: "Hủy đơn hàng thành công",
-          CreatedAt: sequelize.literal("NOW()"),
-        },
-        { transaction: t }
-      );
-      await t.commit();
 
-      const updatedOrder = await Order.findOne({
-        where: {
-          OrderId,
-        },
-        include: [
-          {
-            model: OrderDetail,
-            as: "orderDetails",
-            include: [
-              {
-                model: ProductVariant,
-                as: "productVariant",
-                attributes: {
-                  include: [
-                    [
-                      sequelize.fn(
-                        "fn_GetProductImage",
-                        sequelize.col("orderDetails->productVariant.ProductId"),
-                        sequelize.col("orderDetails->productVariant.ColorId")
-                      ),
-                      "Image",
-                    ],
-                  ],
-                },
-                include: [
-                  {
-                    attributes: ["ProductId", "ProductName"],
-                    model: Product,
-                    as: "product",
-                  },
-                  {
-                    model: Color,
-                    as: "color",
-                  },
-                  {
-                    model: Size,
-                    as: "size",
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            model: OrderState,
-            as: "orderStates",
-          },
-        ],
-        order: [
-          ["OrderTime", "DESC"],
-          ["orderStates", "CreatedAt", "DESC"],
-        ],
-      });
-      res
-        .status(200)
-        .send({ message: "Cancelled successfully", order: updatedOrder });
+  try {
+    // Kiểm tra đăng nhập
+    if (!req.session.user) {
+      return res.status(401).send({ message: "You are not logged in" });
     }
+
+    const order = await Order.findOne({ where: { OrderId } });
+
+    // Kiểm tra đơn hàng tồn tại
+    if (!order) {
+      return res.status(404).send({ message: "Order not found" });
+    }
+
+    // Kiểm tra quyền truy cập
+    if (order.UserId !== req.session.user.UserId) {
+      return res.status(403).send({ message: "Access denied" });
+    }
+
+    // Hủy đơn hàng
+    order.CancelledAt = new Date();
+    await order.save({ transaction: t });
+
+    await OrderState.create({
+      OrderId: order.OrderId,
+      Status: "Hủy đơn hàng thành công",
+      CreatedAt: sequelize.literal("NOW()"),
+    }, { transaction: t });
+
+    await t.commit();
+
+    const updatedOrder = await Order.findOne({
+      where: { OrderId },
+      include: [
+        {
+          model: OrderDetail,
+          as: "orderDetails",
+          include: [
+            {
+              model: ProductVariant,
+              as: "productVariant",
+              attributes: [
+                [
+                  sequelize.fn("fn_GetProductImage", sequelize.col("orderDetails->productVariant.ProductId"), sequelize.col("orderDetails->productVariant.ColorId")),
+                  "Image",
+                ],
+              ],
+              include: [
+                { model: Product, as: "product", attributes: ["ProductId", "ProductName"] },
+                { model: Color, as: "color" },
+                { model: Size, as: "size" },
+              ],
+            },
+          ],
+        },
+        { model: OrderState, as: "orderStates" },
+      ],
+      order: [
+        ["OrderTime", "DESC"],
+        ["orderStates", "CreatedAt", "DESC"],
+      ],
+    });
+
+    res.status(200).send({ message: "Cancelled successfully", order: updatedOrder });
   } catch (error) {
+    console.error(error);
     await t.rollback();
     handleErrorResponse(res, 500, error);
   }
 };
+
+// const cancelOrder = async (req, res) => {
+//   const { UserId, OrderId } = req.params;
+//   const t = await sequelize.transaction();
+//   try {
+//     if (UserId !== req.session.user.UserId) {
+//       return res
+//         .status(403)
+//         .send({ message: "You do not have permission to delete this order" });
+//     }
+//     const order = await Order.findOne(
+//       {
+//         where: {
+//           OrderId,
+//         },
+//       },
+//       { transaction: t }
+//     );
+//     if (order.UserId !== req.session.user.UserId) {
+//       res.status(403).send({ message: "Access denied" });
+//     } else {
+//       order.CancelledAt = new Date();
+//       await order.save({ transaction: t });
+//       await OrderState.create(
+//         {
+//           OrderId: order.OrderId,
+//           Status: "Hủy đơn hàng thành công",
+//           CreatedAt: sequelize.literal("NOW()"),
+//         },
+//         { transaction: t }
+//       );
+//       await t.commit();
+
+//       const updatedOrder = await Order.findOne({
+//         where: {
+//           OrderId,
+//         },
+//         include: [
+//           {
+//             model: OrderDetail,
+//             as: "orderDetails",
+//             include: [
+//               {
+//                 model: ProductVariant,
+//                 as: "productVariant",
+//                 attributes: {
+//                   include: [
+//                     [
+//                       sequelize.fn(
+//                         "fn_GetProductImage",
+//                         sequelize.col("orderDetails->productVariant.ProductId"),
+//                         sequelize.col("orderDetails->productVariant.ColorId")
+//                       ),
+//                       "Image",
+//                     ],
+//                   ],
+//                 },
+//                 include: [
+//                   {
+//                     attributes: ["ProductId", "ProductName"],
+//                     model: Product,
+//                     as: "product",
+//                   },
+//                   {
+//                     model: Color,
+//                     as: "color",
+//                   },
+//                   {
+//                     model: Size,
+//                     as: "size",
+//                   },
+//                 ],
+//               },
+//             ],
+//           },
+//           {
+//             model: OrderState,
+//             as: "orderStates",
+//           },
+//         ],
+//         order: [
+//           ["OrderTime", "DESC"],
+//           ["orderStates", "CreatedAt", "DESC"],
+//         ],
+//       });
+//       res
+//         .status(200)
+//         .send({ message: "Cancelled successfully", order: updatedOrder });
+//     }
+//   } catch (error) {
+//     await t.rollback();
+//     handleErrorResponse(res, 500, error);
+//   }
+// };
 const getUserCoinHistory = async (req, res) => {
   const { UserId } = req.params;
   let { type } = req.query;

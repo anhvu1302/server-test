@@ -28,6 +28,7 @@ module.exports = (sequelize) => {
       User.hasMany(models.Order, {
         foreignKey: "UserId",
         as: "orders",
+        //onDelete: 'CASCADE',
       });
       User.hasMany(models.GroupHasUser, {
         foreignKey: "UserId",
